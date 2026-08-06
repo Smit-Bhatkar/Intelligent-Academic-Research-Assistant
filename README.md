@@ -1,0 +1,97 @@
+# Intelligent Academic Research Assistant — Foundation Build
+
+This is the **Phase 1 (Foundations) + start of Phase 2 (Paper Retrieval)**
+build of the project described in the SRS (`Group_7___SRS_MINOR_PROJECT_II.docx`)
+and the full architecture blueprint. See `PROGRESS.md` for exactly what's
+done, what's next, and how it maps to the SRS/Gantt phases — read that
+file first if you're picking this up after a break.
+
+## What's here
+
+- **backend/** — FastAPI + SQLAlchemy (async, SQLite) + JWT auth + a working
+  arXiv search integration (FR2).
+- **frontend/** — React + TypeScript + Vite + Tailwind, with a Search page
+  wired to the backend.
+- **docker-compose.yml** — runs both together for local dev.
+
+## Quick start (without Docker)
+
+### Backend
+
+```bash
+cd backend
+python -m venv venv
+source venv/bin/activate        # Windows: venv\Scripts\activate
+pip install -r requirements.txt
+cp ../.env.example .env         # edit JWT_SECRET_KEY at minimum
+uvicorn app.main:app --reload
+```
+
+Backend runs at `http://localhost:8000` — interactive API docs at
+`http://localhost:8000/docs`.
+
+### Frontend
+
+```bash
+cd frontend
+npm install
+npm run dev
+```
+
+Frontend runs at `http://localhost:5173`.
+
+## Quick start (with Docker)
+
+```bash
+cp .env.example .env    # edit JWT_SECRET_KEY at minimum
+docker compose up --build
+```
+
+## Verifying it works
+
+```bash
+# Health check
+curl http://localhost:8000/health
+
+# Register + login
+curl -X POST http://localhost:8000/auth/register -H "Content-Type: application/json" \
+  -d '{"name":"Test User","email":"test@example.com","password":"testpass123"}'
+
+curl -X POST http://localhost:8000/auth/login -H "Content-Type: application/json" \
+  -d '{"name":"x","email":"test@example.com","password":"testpass123"}'
+
+# Paper search (real arXiv API call — needs internet)
+curl "http://localhost:8000/search/papers?q=retrieval%20augmented%20generation&max_results=3"
+```
+
+All three were tested and confirmed working during development (see
+`PROGRESS.md` for details and known environment caveats).
+
+## Tech stack (per SRS Section 7.4)
+
+| Layer | Choice |
+|---|---|
+| Backend | Python 3.11+, FastAPI, SQLAlchemy (async), SQLite (dev) |
+| Frontend | React (TypeScript), Vite, TailwindCSS |
+| Auth | JWT (python-jose) + bcrypt (passlib) |
+| Academic data | arXiv API (live), Semantic Scholar + CrossRef (next) |
+| Future (Phase 3+) | LangChain, ChromaDB, Gemini/Groq/Ollama failover |
+
+## Project structure
+
+```
+backend/
+  app/
+    core/       # config, security (JWT, password hashing)
+    db/         # SQLAlchemy engine/session/base
+    models/     # User, ResearchProject, Paper (ORM)
+    schemas/    # Pydantic request/response models
+    api/routes/ # health, auth, search
+    services/   # arxiv_service.py (Phase 2)
+    main.py     # app entrypoint, router wiring, CORS
+frontend/
+  src/
+    api/client.ts   # typed API client
+    pages/          # Home, Search
+    App.tsx          # routing
+```
