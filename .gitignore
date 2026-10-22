@@ -13,3 +13,10 @@ dist/
 
 *.zip
 *:Zone.Identifier
+
+# Storage & cached PDFs
+backend/storage/
+storage/
+
+# Build caches
+*.tsbuildinfo

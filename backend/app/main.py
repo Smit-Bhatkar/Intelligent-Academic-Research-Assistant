@@ -1,21 +1,19 @@
 from contextlib import asynccontextmanager
 
+from app.models import papers
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from app.api.routes import auth, health, search
+from app.api.routes import auth, health, paper, projects, rag, search
 from app.core.config import settings
 from app.db.base import Base
 from app.db.session import engine
 
-# Import models so they register on Base.metadata before create_all runs
-from app.models import user, research_project, paper  # noqa: F401
+from app.models import user, research_project, paper_chunk  # noqa: F401
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    # Dev convenience: auto-create tables on SQLite. Swap for Alembic
-    # migrations once the schema stabilizes / Postgres is introduced.
     async with engine.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)
     yield
@@ -34,6 +32,9 @@ app.add_middleware(
 app.include_router(health.router)
 app.include_router(auth.router)
 app.include_router(search.router)
+app.include_router(projects.router)
+app.include_router(paper.router)
+app.include_router(rag.router)
 
 
 @app.get("/")
