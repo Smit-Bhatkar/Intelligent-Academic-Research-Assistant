@@ -1,17 +1,16 @@
-# Intelligent Academic Research Assistant — Foundation Build
+# Intelligent Academic Research Assistant (ARA)
 
-This is the **Phase 1 (Foundations) + start of Phase 2 (Paper Retrieval)**
+This is the **Phase 1 (Foundations), Phase 2 (Multi-Source Retrieval), and Phase 3 (RAG Core & Multi-Tier LLM Router)**
 build of the project described in the SRS (`Group_7___SRS_MINOR_PROJECT_II.docx`)
-and the full architecture blueprint. See `PROGRESS.md` for exactly what's
-done, what's next, and how it maps to the SRS/Gantt phases — read that
-file first if you're picking this up after a break.
+and the full architecture blueprint.
+
+> 📖 **Full Project Documentation**: See [PROJECT.md](PROJECT.md) for in-depth architecture diagrams, database schema, complete API specifications, LLM failover details, and SRS requirement mapping.  
+> 📌 **Milestones & Status**: See [PROGRESS.md](PROGRESS.md) for current implementation progress and next steps.
 
 ## What's here
 
-- **backend/** — FastAPI + SQLAlchemy (async, SQLite) + JWT auth + a working
-  arXiv search integration (FR2).
-- **frontend/** — React + TypeScript + Vite + Tailwind, with a Search page
-  wired to the backend.
+- **backend/** — FastAPI + SQLAlchemy (async, SQLite) + JWT auth + multi-source academic search (arXiv, Semantic Scholar, CrossRef) + RAG engine with cascading multi-tier LLM router (Gemini -> Groq -> Ollama -> Extractive).
+- **frontend/** — React + TypeScript + Vite + Tailwind, featuring Multi-Source Search and an Interactive Academic Assistant with grounded citations.
 - **docker-compose.yml** — runs both together for local dev.
 
 ## Quick start (without Docker)

@@ -3,9 +3,10 @@
 Single reference for continuing this project in a future session (this chat,
 a new chat, or Claude Code) without re-explaining context. Read this first.
 
-**Status: ~20% complete**, mapped against the SRS Gantt chart (Section 12):
-Phase 1 (Foundations) is done, and the first slice of Phase 2 (Paper
-Retrieval) is done. Phases 2 (remainder), 3, 4, 5, 6 are not started.
+**Status: ~55% complete**, mapped against the SRS Gantt chart (Section 12):
+Phase 1 (Foundations) is done, Phase 2 (Paper Retrieval) is complete, and
+Phase 3 (RAG Core & LLM Router) is active and integrated. Phases 4, 5, 6
+are up next.
 
 ---
 
@@ -17,78 +18,63 @@ Retrieval) is done. Phases 2 (remainder), 3, 4, 5, 6 are not started.
 - Async SQLAlchemy setup (SQLite for dev, swappable to Postgres via
   `DATABASE_URL` — no code changes needed, per SRS NFR6).
 - ORM models: `User`, `ResearchProject`, `Paper` (matches SRS Class Diagram,
-  Section 10). `Paper` here is a lightweight relational cache of search
-  results — full chunk/embedding storage in ChromaDB is Phase 3, not built.
+  Section 10). `PaperChunk` model for RAG chunks and vector embeddings.
 - Auth (FR1): register, login, JWT issuance, bcrypt password hashing.
   **Tested live**: register → login → duplicate-email rejection (400) all
   passed against a running server.
+- `require_auth` dependency in `core/deps.py` protecting `/projects` and `/papers`.
 - React + TypeScript + Vite + Tailwind frontend skeleton, with routing
-  (Home, Search pages). **Verified**: `npm install`, `tsc -b` typecheck,
+  (Home, Search, Assistant pages). **Verified**: `npm install`, `tsc -b` typecheck,
   and `vite build` all pass cleanly.
 - `docker-compose.yml` wiring backend + frontend for local dev.
 
-### Phase 2 — Paper Retrieval (started)
-- arXiv search service (FR2), no API key required. Code is correct and
-  follows a `search(query, max_results) -> list[PaperResult]` provider
-  shape, specifically so Semantic Scholar and CrossRef can be added next
-  without changing the route or the frontend.
-- Search page in the frontend calls this endpoint and renders results.
+### Phase 2 — Multi-Source Paper Retrieval (Complete)
+- **arXiv search service** (`arxiv_service.py`) using arXiv API.
+- **Semantic Scholar search service** (`semantic_scholar_service.py`) querying
+  Semantic Scholar Graph API with optional API key support.
+- **CrossRef search service** (`crossref_service.py`) with polite User-Agent,
+  JATS XML tag stripping from abstracts, and open-access PDF extraction.
+- **Concurrent Fan-Out & Deduplication** (`search.py`):
+  - Concurrent `asyncio.gather` across arXiv, Semantic Scholar, and CrossRef.
+  - Two-stage deduplication by normalized DOI and normalized title.
+  - Metadata merging preserving richest abstracts, authors, and direct PDF links.
+- **Frontend Search Page** (`Search.tsx`):
+  - Distinct colored badges for sources (arXiv, Semantic Scholar, CrossRef).
+  - Direct "Ask with RAG" integration carrying paper metadata into the Assistant.
+- **Project & Paper Management**:
+  - `POST /projects` and `POST /projects/{id}/papers` endpoints for saving search results.
+  - `POST /papers/{id}/download` for automated PDF caching to disk.
 
-### Bugs found and fixed during build (worth knowing about)
-- `passlib` 1.7.4 + `bcrypt` 4.1+ are incompatible (`AttributeError: module
-  'bcrypt' has no attribute '__about__'`). Pinned `bcrypt==4.0.1` in
-  `requirements.txt`. If you ever bump bcrypt, re-test register/login.
-- `pydantic[email]` (`EmailStr`) needs `email-validator` explicitly —
-  added to `requirements.txt`.
-- Vite's `import.meta.env` needs `frontend/src/vite-env.d.ts` with
-  `/// <reference types="vite/client" />` or `tsc` fails. Already added.
-
-### Known environment caveat (not a code bug)
-- The arXiv live call could only be *code-reviewed*, not *proven end-to-end*,
-  inside the sandboxed dev environment used to build this — that sandbox's
-  network allowlist covers npm/PyPI but not `export.arxiv.org`, so the call
-  returned a 403 from the proxy, not from arXiv itself. Run the same curl
-  command from `README.md` on your own machine (which has normal internet
-  access) to confirm — the `arxiv` Python package usage is standard and
-  should work as written.
+### Phase 3 — RAG Core & LLM Router
+- PDF text extraction (`pypdf`) and semantic chunking with overlap.
+- Vector embedding and cosine similarity ranking.
+- **LLM Router Failover Chain** (`llm_router.py`):
+  - Cascades through **Gemini** → **Groq** → **Local Ollama** → **Extractive Fallback**.
+  - Provides zero-API-key offline fallback ensuring the system never breaks.
+- Interactive Research Assistant UI (`Assistant.tsx`):
+  - Indexed paper management, PDF upload, multi-paper selection.
+  - Specialized research prompts: Comprehensive Q&A, Executive Summary, Methodology Analysis, Research Gaps, BibTeX generation.
+  - Grounded citation badges with snippet inspection and similarity scoring.
 
 ---
 
-## ⏭️ Next up (rest of Phase 2, in order)
+## ⏭️ Next up (Phases 4–6)
 
-1. Add `semantic_scholar_service.py` and `crossref_service.py` following the
-   exact same `search()` shape as `arxiv_service.py`.
-2. Update `search.py` route to fan out to all three, merge results, and
-   de-duplicate by DOI (fall back to title similarity if DOI is missing).
-3. Add `POST /projects` and `POST /projects/{id}/papers` endpoints so a
-   logged-in user can save search results into a `ResearchProject` (uses
-   the `Paper` and `ResearchProject` models already built).
-4. Add a `require_auth` FastAPI dependency (decode JWT → load `User`) and
-   protect the new project endpoints with it — `core/security.py` already
-   has `create_access_token`; decoding + a dependency still needs writing.
-
-## Then Phase 3 — RAG Core (the big one)
-- PDF ingestion (pymupdf/pdfplumber) → chunking → embeddings
-  (sentence-transformers) → ChromaDB.
-- `LLMRouter` / `LLMResolver` — the Gemini → Groq → Ollama failover chain,
-  fully designed already in the blueprint's Section 11 (reference
-  implementation included there — it can likely be dropped in with minimal
-  changes).
-- Chat endpoint wired through the RAG pipeline + LLMRouter, with streaming
-  (SSE) and citation display on the frontend.
-
-## Then Phases 4–6
-Summarization / keyword extraction / topic modeling → paper comparison /
-research gap identification / citation generator / literature review +
-proposal generation → auth polish, deployment, docs. See the blueprint's
-Section 12 (Suggested Phased Build Order) for the fuller breakdown — it
-hasn't changed.
+1. **Phase 4: Advanced Analysis & Knowledge Synthesis**
+   - Automated keyword extraction & topic modeling across project papers.
+   - Cross-paper comparison matrix (comparing methodologies, datasets, findings).
+   - Automated research gap identification and literature review generation.
+2. **Phase 5: Citation & Export Tools**
+   - Direct export to BibTeX, APA, MLA, Chicago formats.
+   - Project export as Markdown or PDF report.
+3. **Phase 6: Production Polish & Deployment**
+   - Background worker tasks for large PDF processing.
+   - Production Docker configurations and CI/CD pipelines.
 
 ---
 
 ## How to resume this in one line
 
-> "Continue the Academic Research Assistant from PROGRESS.md — build the
-> Semantic Scholar and CrossRef services next."
+> "Continue the Academic Research Assistant from PROGRESS.md — build Phase 4 (topic modeling and paper comparison matrix)."
 
 That's enough context for a fresh session to pick this up correctly.
